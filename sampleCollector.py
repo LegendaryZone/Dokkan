@@ -12,6 +12,7 @@ import threading
 import puzzleSolver
 import urllib.request
 import settings
+import math
 
 def createSamples(_pageURL, _chrome_options=None, nSamples=1):
     if(_chrome_options is None):
@@ -53,40 +54,60 @@ def createSamples(_pageURL, _chrome_options=None, nSamples=1):
 def movePieceToPuzzle(_driver, _piece, _GP, _P1, _P2):
     gx1, gy1 = _GP
     x2, y2 = _P1
-    print("Piece Coord : " + str(_P2[0]) + "," + str(_P2[1]))
+    #print("Piece Coord : " + str(_P2[0]) + "," + str(_P2[1]))
     # x2 = x2 + _P2[0] - 50
     # y2 = y2 + _P2[1] - 50
     actionChains = ActionChains(_driver)
     actionChains.move_to_element(_piece)
     actionChains.perform()
     actionChains.click_and_hold(_piece)
+   
     xOffset = 0
     yOffset = 0
     speed = 5
+    
     if(gx1 < x2):
+        slope = math.ceil((y2 - gy1) / (x2 - gx1))
         xOffset = 1 * speed
-        while(gx1 <= x2):
-            actionChains.move_by_offset(xOffset, 0)
+        while(gx1 <= x2 and gy1 >= y2):
+            actionChains.move_by_offset(xOffset, slope * speed)
             gx1 += xOffset
-        actionChains.move_by_offset(gx1 - x2, 0)
-        if(gy1 > y2):   
-            yOffset = -1 * speed
-            while(gy1 >= y2):
-                actionChains.move_by_offset(0, yOffset)
-                gy1 += yOffset
-            actionChains.move_by_offset(0, y2 - gy1)
-    elif(x2 < gx1):
-        xOffset = -1 * speed
-        while(x2 <= gx1):
-            actionChains.move_by_offset(xOffset, 0)
-            gx1 += xOffset
-        actionChains.move_by_offset(x2 - gx1, 0)
+            gy1 += slope * speed
+        actionChains.move_by_offset(gx1 - x2, slope * speed)
+        gy1 += slope * speed
         if(gy1 > y2):
             yOffset = -1 * speed
             while(gy1 >= y2):
                 actionChains.move_by_offset(0, yOffset)
                 gy1 += yOffset
             actionChains.move_by_offset(0, y2 - gy1)
+        elif(gy1 < y2):
+            yOffset = 1 * speed
+            while(gy1 <= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, gy1 - y2)
+    elif(x2 < gx1):
+        slope = math.ceil((y2 - gy1) / (x2 - gx1))
+        xOffset = -1 * speed
+        while(x2 <= gx1 and gy1 >= y2):
+            actionChains.move_by_offset(xOffset, slope * speed)
+            gx1 += xOffset
+            gy1 += slope * speed
+        actionChains.move_by_offset(x2 - gx1, slope * speed)
+        gy1 += slope * speed
+        if(gy1 > y2):
+            yOffset = -1 * speed
+            while(gy1 >= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, y2 - gy1)
+        elif(gy1 < y2):
+            yOffset = 1 * speed
+            while(gy1 <= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, gy1 - y2)
     elif(x2 == gx1):
         if(gy1 > y2):
             yOffset = -1 * speed
@@ -94,6 +115,12 @@ def movePieceToPuzzle(_driver, _piece, _GP, _P1, _P2):
                 actionChains.move_by_offset(0, yOffset)
                 gy1 += yOffset
             actionChains.move_by_offset(0, y2 - gy1)
+        elif(gy1 < y2):
+            yOffset = 1 * speed
+            while(gy1 <= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, gy1 - y2)
 
     actionChains.release()
     actionChains.perform()
@@ -180,7 +207,7 @@ def solveCaptcha(_pageURL, _mode=settings.SOLVEMODE):
         gx1 = left[:-2] 
         GP = (int(gx1), int(gy1))
 
-        print("{}, {}".format(gx1, gy1))
+        #print("{}, {}".format(gx1, gy1))
 
         floc = firstPiece.location
         fpCropped = image[floc['y']:floc['y'] + 100 , floc['x']:floc['x'] + 100]
@@ -223,22 +250,8 @@ def solveCaptcha(_pageURL, _mode=settings.SOLVEMODE):
                 break
 
     movePieceToPuzzle(driver, firstPiece, GP, P1, P2)
-    if(GP2 is not None):
+    if GP2 is not None:
         movePieceToPuzzle(driver, secondPiece, GP2, SP1, SP2)
 
     #Submit the puzzle and wait for result
     driver.find_element_by_xpath("/html/body/div/form/button").click()
-    
-
-
-
-
-
-
-
-
-
-
-
-
-

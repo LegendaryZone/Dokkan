@@ -269,7 +269,7 @@ def getResultCoordinates(_puzzlePath, _piecePath, mode=settings.SOLVEMODE):
             return (puzzleCoord, pieceCoord)
         else:
             #If found, output the solution location
-            print("Piece Coordinates : {} Puzzle Coordinates : {}".format(puzzleCoord, pieceCoord))
+            #print("Piece Coordinates : {} Puzzle Coordinates : {}".format(puzzleCoord, pieceCoord))
             resultPosition1 = ((puzzleCoord[0][0] - pieceCoord[0][0]),(puzzleCoord[0][1] - pieceCoord[0][1]))
             if(len(puzzleCoord) > 1):
                 resultPosition2 = ((puzzleCoord[1][0] - pieceCoord[1][0]),(puzzleCoord[1][1] - pieceCoord[1][1]))
