@@ -816,7 +816,7 @@ def create_new_account(k, q, platform, account_count):
                             settings.init_browser(chrome_options)
                         wd = settings.BROWSER
                         for kkkkk in range(0, 3):                 
-                            sampleCollector.solveCaptcha(captcha_url)                            
+                            sampleCollector.solveCaptcha(captcha_url, settings.SOLVEMODE)                            
                             text = None
                             tmout = 60
                             print("{}# Solve it in {} seconds".format(k, tmout))
@@ -1195,7 +1195,7 @@ def sign_in(user_account):
                     settings.init_browser(chrome_options)
                 wd = settings.BROWSER
                 for kkkkk in range(0, 3):
-                    sampleCollector.solveCaptcha(captcha_url)
+                    sampleCollector.solveCaptcha(captcha_url, settings.SOLVEMODE)
                     text = None
                     tmout = 60
                     print("{}# Solve it in {} seconds".format(id_, tmout))
