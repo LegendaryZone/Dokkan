@@ -1,53 +1,17 @@
 from datetime import datetime
 
+from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 import time
 import requests
-from selenium import webdriver
 import os
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import threading
 import puzzleSolver
-
-#variables used by createSamples module
-#pageURL : url of the authentication page
-#imgName : name attribute of image [right click puzzle -> inspect element -> name attribute ..] typically of form xxxxxxxximage
-#refreshID : id attribute of refresh icon [right click refresh icon -> inspect element -> id attribute ..] typically of form xxxxxxxxchange
-
-#path variables
-fileSeparator = "\\"
-captchaDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_source" +  fileSeparator
-puzzleDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_puzzle" +  fileSeparator
-pieceDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_piece" +  fileSeparator
-
-
-class WindowFinder:
-    #Class to find and make focus on a particular Native OS dialog/Window
-    def __init__ (self):
-        self._handle = None
-
-    def find_window(self, class_name, window_name = None):
-        #Pass a window class name & window name directly if known to get the window
-        self._handle = win32gui.FindWindow(class_name, window_name)
-
-    def _window_enum_callback(self, hwnd, wildcard):
-        #Call back func which checks each open window and matches the name of window using reg ex
-        if re.match(wildcard, str(win32gui.GetWindowText(hwnd))) != None:
-            self._handle = hwnd
-
-    def find_window_wildcard(self, wildcard):
-        #This function takes a string as input and calls EnumWindows to enumerate through all open windows
-        self._handle = None
-        win32gui.EnumWindows(self._window_enum_callback, wildcard)
-
-    def set_foreground(self):
-        #Get the focus on the desired open window
-        win32gui.SetForegroundWindow(self._handle)
-
-
-
+import urllib.request
+import settings
 
 def createSamples(_pageURL, _chrome_options=None, nSamples=1):
     if(_chrome_options is None):
@@ -74,9 +38,8 @@ def createSamples(_pageURL, _chrome_options=None, nSamples=1):
             
             #urrlib doesn't allow to save to different folder, so moving is necessary (or so it seems)
             urllib.request.urlretrieve(oldTag, imageFileName)
-            os.rename(imageFileName, os.path.join(captchaDir, imageFileName))
-            
-            count += 1;
+            os.rename(imageFileName, os.path.join(settings.CAPTCHADIR, imageFileName))        
+            count += 1
             
             #click on refresh to get the next image
             refreshElement = driver.find_element_by_xpath("//a[contains(@id,'change')]")
@@ -85,25 +48,106 @@ def createSamples(_pageURL, _chrome_options=None, nSamples=1):
             #if next image hasn't been loaded yet, then wait for some time.
             #currently it is 3 seconds, reduce it based on your network connection speed.
             time.sleep(3)
-    
-    return driver
-    
+    driver.close()
 
+def movePieceToPuzzle(_driver, _piece, _GP, _P1, _P2):
+    gx1, gy1 = _GP
+    x2, y2 = _P1
+    print("Piece Coord : " + str(_P2[0]) + "," + str(_P2[1]))
+    # x2 = x2 + _P2[0] - 50
+    # y2 = y2 + _P2[1] - 50
+    actionChains = ActionChains(_driver)
+    actionChains.move_to_element(_piece)
+    actionChains.perform()
+    actionChains.click_and_hold(_piece)
+    xOffset = 0
+    yOffset = 0
+    speed = 5
+    if(gx1 < x2):
+        xOffset = 1 * speed
+        while(gx1 <= x2):
+            actionChains.move_by_offset(xOffset, 0)
+            gx1 += xOffset
+        actionChains.move_by_offset(gx1 - x2, 0)
+        if(gy1 > y2):   
+            yOffset = -1 * speed
+            while(gy1 >= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, y2 - gy1)
+    elif(x2 < gx1):
+        xOffset = -1 * speed
+        while(x2 <= gx1):
+            actionChains.move_by_offset(xOffset, 0)
+            gx1 += xOffset
+        actionChains.move_by_offset(x2 - gx1, 0)
+        if(gy1 > y2):
+            yOffset = -1 * speed
+            while(gy1 >= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, y2 - gy1)
+    elif(x2 == gx1):
+        if(gy1 > y2):
+            yOffset = -1 * speed
+            while(gy1 >= y2):
+                actionChains.move_by_offset(0, yOffset)
+                gy1 += yOffset
+            actionChains.move_by_offset(0, y2 - gy1)
 
-def solveCaptcha(_pageURL, _chrome_options=None, _mode=2):
-    if(_chrome_options is None):
-        #print('Chrome options is none')
-        _chrome_options = webdriver.ChromeOptions()
-    driver = webdriver.Chrome(chrome_options=_chrome_options)
+    actionChains.release()
+    actionChains.perform()
+
+def postProcessCaptcha(capDir):
+    directory = os.fsencode(capDir)
+
+    for file in os.listdir(directory):
+        filename = os.fsdecode(file)
+        image_path = os.path.join(settings.CAPTCHADIR, filename)
+        if filename.endswith(".png"): 
+            img = cv2.imread(image_path)           
+            height, width, channels = img.shape
+            if(img is not None):
+                puzzle = img[0:214, 0:320]
+                cv2.imwrite(os.path.join(settings.PUZZLEDIR, filename), puzzle)
+                
+                if(width == 840):
+                    piece1 = img[5:105, 325:425]
+                    piece1Name = os.path.splitext(filename)[0] + "_piece1.png"
+                    cv2.imwrite(os.path.join(settings.PIECEDIR, piece1Name), piece1)
+                    piece2 = img[5:105, 460:560]
+                    piece2Name = os.path.splitext(filename)[0] + "_piece2.png"
+                    cv2.imwrite(os.path.join(settings.PIECEDIR, piece2Name), piece2)
+                elif(width == 540):
+                    piece = img[5:105, 325:425]
+                    cv2.imwrite(os.path.join(settings.PIECEDIR, filename), piece)
+                os.remove(image_path)              
+            continue
+        else:
+            continue    
+
+if __name__ == '__main__':
+    createSamples("http://localhost/Captcha.html")
+    postProcessCaptcha(settings.CAPTCHADIR)
+
+def solveCaptcha(_pageURL, _mode=settings.SOLVEMODE):
+    driver = settings.BROWSER
     driver.get(_pageURL)
     assert "Authorize with Captcha" in driver.title
     
+    GP = None
+    GP2 = None
+    P1 = None
+    P2 = None
+    SP1 = None
+    SP2 = None
+    firstPiece = None
+    secondPiece = None
+
     while True:
         driver.refresh()
 
         imageElement = driver.find_element_by_xpath("//img[contains(@name,'image')]")
-        imageSource = imageElement.get_attribute("src")
-        #print("Image URL : {}".format(imageSource))
         refreshElement = driver.find_element_by_xpath("//a[contains(@id,'change')]")
         pieceElement = driver.find_element_by_xpath("//div[contains(@id,'pieces')]")
         refreshID = refreshElement.get_attribute("id")
@@ -119,14 +163,12 @@ def solveCaptcha(_pageURL, _chrome_options=None, _mode=2):
         driver.save_screenshot('screenshot.png')
         driver.execute_script(showScript)
         loc = imageElement.location
-        width = 320
-        height = 214
         image = cv2.imread('screenshot.png', True)
 
         cropped = image[loc['y']:loc['y'] + 214 , loc['x']:loc['x'] + 320]    
-        puzzlePath = os.path.join(puzzleDir, imageFileName) 
+        puzzlePath = os.path.join(settings.PUZZLEDIR, imageFileName) 
         cv2.imwrite(puzzlePath, cropped)
-        os.remove('screenshot.png')
+        
         pieces = pieceElement.find_elements_by_tag_name("div")
         style = pieces[0].get_attribute("style")
         allPieces = pieces[0].find_elements_by_tag_name("div")
@@ -134,12 +176,11 @@ def solveCaptcha(_pageURL, _chrome_options=None, _mode=2):
         firstText = [x.strip() for x in style.split(';')]
         top = [x.strip() for x in firstText[-3].split(':')][-1]
         left = [x.strip() for x in firstText[-2].split(':')][-1]
-        y1 = top[:-2]
-        x1 = left[:-2] 
-        print("{}, {}".format(x1,y1))
-        pieceImage = firstPiece.find_elements_by_tag_name("img")[0]
-        actionChains = ActionChains(driver)
+        gy1 = top[:-2]
+        gx1 = left[:-2] 
+        GP = (int(gx1), int(gy1))
 
+        print("{}, {}".format(gx1, gy1))
 
         floc = firstPiece.location
         fpCropped = image[floc['y']:floc['y'] + 100 , floc['x']:floc['x'] + 100]
@@ -147,89 +188,49 @@ def solveCaptcha(_pageURL, _chrome_options=None, _mode=2):
         if(len(allPieces) == 2):
             #print("Second Jigsaw!!")
             piece1Name = os.path.splitext(imageFileName)[0] + "_piece1.png"
-            piece1Path = os.path.join(pieceDir, piece1Name)
+            piece1Path = os.path.join(settings.PIECEDIR, piece1Name)
             cv2.imwrite(piece1Path, fpCropped)
 
             secondPiece = allPieces[1]
             sloc = secondPiece.location
-            spCropped = image[sloc['y']:sloc['y'] + 100 , sloc['x']:sloc['x'] + 100]
+            spCropped = image[sloc['y']:sloc['y'] + 100, sloc['x']:sloc['x'] + 100]
             piece2Name = os.path.splitext(imageFileName)[0] + "_piece2.png"
-            piece2Path = os.path.join(pieceDir, piece2Name)
+            piece2Path = os.path.join(settings.PIECEDIR, piece2Name)
 
 
             cv2.imwrite(piece2Path, spCropped)
         else:
-            piece1Path = os.path.join(pieceDir, imageFileName)
+            piece1Path = os.path.join(settings.PIECEDIR, imageFileName)
             cv2.imwrite(piece1Path, fpCropped) 
 
-        x2 , y2 = puzzleSolver.getResultCoordinates(puzzlePath, piece1Path, piece2Path, mode=_mode)
-        os.remove(puzzlePath)
-        os.remove(imageFileName)
-        os.remove(piece1Path)
-        
+        P1, P2 = puzzleSolver.getResultCoordinates(puzzlePath, piece1Path, mode=_mode)
         if(piece2Path is not None):
-            os.remove(piece2Path)
-        if(x is not None and y is not None):
-            break
-    actionChains.move_to_element(firstPiece)
-    actionChains.perform()
-    actionChains.click_and_hold(firstPiece)
-    
-    actionChains.move_to_element(firstPiece)
-    actionChains.perform()
-    actionChains.click_and_hold(firstPiece)
-    
-    if(x2 != x1):
-        slope = (y2 - y1)/(x2 - x1)
-        while(x1 != x2):
-            actionChains.move_by_offset(1, slope)
-            x2 
-            
-    else:
-        while(y1 != y2):
-            actionChains.move_by_offset(0, -1)
-            y2 -= 1
-        
-    
+            SP1, SP2 = puzzleSolver.getResultCoordinates(puzzlePath, piece2Path, mode=_mode)
 
-    actionChains.release()
-    actionChains.perform()
+        #Clean up if mode is SOLVEMODE
+        if(_mode == settings.SOLVEMODE):
+            os.remove('screenshot.png')
+            os.remove(puzzlePath)
+            os.remove(imageFileName)
+            os.remove(piece1Path)      
+            if(piece2Path is not None):
+                os.remove(piece2Path)
+        if(P1 is not None and P2 is not None):
+            if(piece2Path is not None):
+                if(SP1 is not None and SP2 is not None):
+                    break
+            else:
+                break
+
+    movePieceToPuzzle(driver, firstPiece, GP, P1, P2)
+    if(GP2 is not None):
+        movePieceToPuzzle(driver, secondPiece, GP2, SP1, SP2)
+
+    #Submit the puzzle and wait for result
     driver.find_element_by_xpath("/html/body/div/form/button").click()
-    return (driver, (x,y))
     
-    
-def postProcessCaptcha(capDir):   
-    directory = os.fsencode(capDir)
 
-    for file in os.listdir(directory):
-        filename = os.fsdecode(file)
-        image_path = os.path.join(captchaDir, filename)
-        if filename.endswith(".png"): 
-            img = cv2.imread(image_path)           
-            height, width, channels = img.shape
-            if(img is not None):
-                puzzle = img[0:214, 0:320]
-                cv2.imwrite(os.path.join(puzzleDir, filename), puzzle)
-                
-                if(width == 840):
-                    piece1 = img[5:105, 325:425]
-                    piece1Name = os.path.splitext(filename)[0] + "_piece1.png"
-                    cv2.imwrite(os.path.join(pieceDir, piece1Name), piece1)
-                    piece2 = img[5:105, 460:560]
-                    piece2Name = os.path.splitext(filename)[0] + "_piece2.png"
-                    cv2.imwrite(os.path.join(pieceDir, piece2Name), piece2)
-                elif(width == 540):
-                    piece = img[5:105, 325:425]
-                    cv2.imwrite(os.path.join(pieceDir, filename), piece)
-                os.remove(image_path)              
-            continue
-        else:
-            continue
 
-if __name__ == '__main__':
-    driver = createSamples("http://localhost/Captcha.html")
-    driver.close()
-    postProcessCaptcha(captchaDir)
 
 
 

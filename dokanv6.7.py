@@ -13,17 +13,7 @@ import json
 import threading
 import sys
 import pickle
-
-
-##
-## modified piece of code 
-import sampleCollector
-fileSeparator = "\\"
-captchaDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_source" +  fileSeparator
-puzzleDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_puzzle" +  fileSeparator
-pieceDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_piece" +  fileSeparator
-##
-##
+import cv2
 
 try:
     from urllib.parse import urlparse
@@ -34,6 +24,11 @@ from queue import Queue
 from pprint import pprint
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
+
+import settings
+settings.init()
+import sampleCollector
+
 
 DBVERSION = 4
 
@@ -811,33 +806,17 @@ def create_new_account(k, q, platform, account_count):
                     if r.json()["reason"] == "Require Captcha":
                         captcha_url = r.json()["captcha_url"]
                         captcha_session_key = r.json()["captcha_session_key"]
-                        for kkkkk in range(0, 3):
-                            chrome_options = webdriver.ChromeOptions()
-                            chrome_options.add_argument("--start-maximized")
-                            prx = proxy2()
-                            if prx:
-                                chrome_options.add_argument('--proxy-server=http://%s' % prx)
-                                
+                        chrome_options = webdriver.ChromeOptions()
+                        chrome_options.add_argument("--start-maximized")
+                        prx = proxy2()
+                        if prx:
+                            chrome_options.add_argument('--proxy-server=http://%s' % prx)
 
-                            #to avoid opening multiple browser window, I have commented your code
-                            #uncomment below line if you have commented my code.
-                            #wd = webdriver.Chrome(chrome_options=chrome_options)
-                            ##
-                            
-                            ##
-                            ## modified piece of code
-                            ## 
-                            #  10 is number of samples to be collected
-                            
-#                            wd = sampleCollector.createSamples(captcha_url,chrome_options, 10)
-#                            sampleCollector.postProcessCaptcha(captchaDir)
-                            
-                            ## HOMMODE is for debugging purpose. Remove that unless necessary
-                            wd, coordinates = sampleCollector.solveCaptcha(captcha_url, chrome_options)
-                            #print(coordinates)
-                            ##
-                            ##
-                            
+                        if(settings.BROWSER is None):    
+                            settings.init_browser(chrome_options)
+                        wd = settings.BROWSER
+                        for kkkkk in range(0, 3):                 
+                            sampleCollector.solveCaptcha(captcha_url)                            
                             text = None
                             tmout = 60
                             print("{}# Solve it in {} seconds".format(k, tmout))
@@ -849,20 +828,20 @@ def create_new_account(k, q, platform, account_count):
                                     print("{}# {}".format(k, tmout - iiii))
                                     time.sleep(1)
 
-                            wd.quit()
+                            # wd.quit()
 
                             if not text:
                                 continue
 
                             j = json.loads(text)
                             if j['captcha_result'] == 'success':
-                                wd.quit()
+                                # wd.quit()
                                 break
 
-                        try:
-                            wd.quit()
-                        except:
-                            pass
+                        # try:
+                        #     wd.quit()
+                        # except:
+                        #     pass
 
                         sign_up_data['captcha_session_key'] = captcha_session_key
                         r = requests.post(host + '/auth/sign_up', json=sign_up_data, headers=headers1, proxies=proxy(1))
@@ -1206,34 +1185,17 @@ def sign_in(user_account):
             if r.json()["reason"] == "Require Captcha":
                 captcha_url = r.json()["captcha_url"]
                 captcha_session_key = r.json()["captcha_session_key"]
-                # ~ print(captcha_url)
-                # ~ time.sleep(60)
+                chrome_options = webdriver.ChromeOptions()
+                chrome_options.add_argument("--start-maximized")
+                prx = proxy2()
+                if prx:
+                    chrome_options.add_argument('--proxy-server=http://%s' % prx)
+                
+                if(settings.BROWSER is None):    
+                    settings.init_browser(chrome_options)
+                wd = settings.BROWSER
                 for kkkkk in range(0, 3):
-                    chrome_options = webdriver.ChromeOptions()
-                    chrome_options.add_argument("--start-maximized")
-                    prx = proxy2()
-                    if prx:
-                        chrome_options.add_argument('--proxy-server=http://%s' % prx)
-
-
-                    #to avoid opening multiple browser window, I have commented your code
-                    #uncomment below line if you have commented my code.
-                    #wd = webdriver.Chrome(chrome_options=chrome_options)
-                    ##
-
-                    ##
-                    ## modified piece of code
-                    ## 
-                    #  10 is number of samples to be collected
-
-#                            wd = sampleCollector.createSamples(captcha_url,chrome_options, 10)
-#                            sampleCollector.postProcessCaptcha(captchaDir)
-
-                    ## HOMMODE is for debugging purpose. Remove that unless necessary
-                    wd, coordinates = sampleCollector.solveCaptcha(captcha_url, chrome_options)
-                    #print(coordinates)
-                    ##
-                    ##
+                    sampleCollector.solveCaptcha(captcha_url, chrome_options)
                     text = None
                     tmout = 60
                     print("{}# Solve it in {} seconds".format(id_, tmout))
@@ -1246,20 +1208,20 @@ def sign_in(user_account):
                             print("{}# {}".format(id_, tmout - iiii))
                             time.sleep(1)
 
-                    wd.quit()
+                    # wd.quit()
 
                     if not text:
                         continue
 
                     j = json.loads(text)
                     if j['captcha_result'] == 'success':
-                        wd.quit()
+                        # wd.quit()
                         break
 
-                try:
-                    wd.quit()
-                except:
-                    pass
+                # try:
+                #     wd.quit()
+                # except:
+                #     pass
 
                 sign_in_data['captcha_session_key'] = captcha_session_key
                 r = requests.post(url, json=sign_in_data, headers=headers2, proxies=proxy(2))

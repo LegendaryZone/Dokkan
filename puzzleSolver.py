@@ -6,18 +6,7 @@ import math
 import heapq as hq
 import argparse
 import os
-
-
-#SOME GLOBAL VARS
-#Change the unique image directory as per your config.
-VFMODE      = 1
-SOLVEMODE   = 2
-HOMMODE     = 3
-MIN_MATCH_COUNT = 10
-fileSeparator = "\\"
-puzzleDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_puzzle" + fileSeparator
-COMPLETED_DIR = puzzleDir + "completedPuzzle" + fileSeparator + "ping"
-pieceDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_piece" +  fileSeparator
+import settings
 
 
 def get_key(item):
@@ -94,16 +83,16 @@ def drawMatches(img1, kp1, img2, kp2, matches):
         
     out = None
     if(chan1 == 1):
-        out = np.zeros((max([rows1,rows2]),cols1+cols2, 3), dtype='uint8')
+        out = np.zeros((max([rows1, rows2]),cols1+cols2, 3), dtype='uint8')
         # Place the first image to the left
-        out[:rows1,:cols1] = np.dstack([img1, img1, img1])
+        out[:rows1, :cols1] = np.dstack([img1, img1, img1])
 
         # Place the next image to the right of it
-        out[:rows2,cols1:] = np.dstack([img2, img2, img2])
+        out[:rows2, cols1:] = np.dstack([img2, img2, img2])
     elif(chan1 == 3):
-        out = np.zeros((max([rows1,rows2]),cols1+cols2, chan1), dtype='uint8')
-        out[:rows1,:cols1] = np.dstack([img1])
-        out[:rows2,cols1:] =  np.dstack([img2])
+        out = np.zeros((max([rows1, rows2]), cols1+cols2, chan1), dtype='uint8')
+        out[:rows1, :cols1] = np.dstack([img1])
+        out[:rows2, cols1:] = np.dstack([img2])
 
     # For each pair of points we have between both images
     # draw circles, then connect a line between them
@@ -117,22 +106,20 @@ def drawMatches(img1, kp1, img2, kp2, matches):
         img1_idx = mat.queryIdx
         img2_idx = mat.trainIdx
 
-        (x1,y1) = kp1[img1_idx].pt
-        (x2,y2) = kp2[img2_idx].pt
+        (x1, y1) = kp1[img1_idx].pt
+        (x2, y2) = kp2[img2_idx].pt
         
-        p1 = (int(x1),int(y1))
-        p2 = (int(x2),int(y2))
+        p1 = (int(x1), int(y1))
+        p2 = (int(x2), int(y2))
         
         if(previousP1 != p1 and previousP2 != p2):
             previousP1 = p1
             previousP2 = p2
             puzzlePoints.append(p2)
             jigsawPoints.append(p1)
-            #debug mode
-            #print(str(p1) + "->" + str(p2)) 
             cv2.circle(out, (int(x1), int(y1)), 4, blueColor, 1)   
-            cv2.circle(out, (int(x2)+cols1,int(y2)), 4, blueColor, 1)      
-            cv2.line(out, (int(x1), int(y1)), (int(x2)+cols1,int(y2)), blueColor, 1)
+            cv2.circle(out, (int(x2) + cols1, int(y2)), 4, blueColor, 1)      
+            cv2.line(out, (int(x1), int(y1)), (int(x2) + cols1, int(y2)), blueColor, 1)
     
     puzzleResult = None
     if(len(puzzlePoints) > 2):
@@ -154,7 +141,7 @@ def drawMatches(img1, kp1, img2, kp2, matches):
     
     return (out,puzzleResult, jigSawResult)
 
-def verifyImage(img1, img2, mode=SOLVEMODE):
+def verifyImage(img1, img2, mode=settings.SOLVEMODE):
     # Detect the SIFT key points and compute the descriptors for the two images
     sift = cv2.xfeatures2d.SIFT_create()
     keyPoints1, descriptors1 = sift.detectAndCompute(img1, None)
@@ -172,14 +159,14 @@ def verifyImage(img1, img2, mode=SOLVEMODE):
             goodMatches.append(m)
 
     
-    if(mode == VFMODE):
+    if(mode == settings.VFMODE):
         return len(goodMatches)  
     else:
         if(len(goodMatches) > 0):
             result, puzzleCoord, pieceCoord = drawMatches(img1, keyPoints1, img2, keyPoints2, goodMatches)
             if(result is None or puzzleCoord is None or pieceCoord is None):
                 return (None, None, None, None)
-            if len(goodMatches) >= MIN_MATCH_COUNT:
+            if len(goodMatches) >= settings.MIN_MATCH_COUNT:
                 # Get the possible solution coordinates
                 sourcePoints = np.float32([ keyPoints1[m.queryIdx].pt for m in goodMatches ]).reshape(-1, 1, 2)
                 destinationPoints = np.float32([ keyPoints2[m.trainIdx].pt for m in goodMatches ]).reshape(-1, 1, 2)
@@ -209,51 +196,51 @@ def verifyImage(img1, img2, mode=SOLVEMODE):
         else:
             return (None, None, None, None)
         
-#
-#Main Module to solve the puzzle
-#Has 3 possible outcome
-#Outcome1:  (None, None) returned if puzzle can't be solved due to unavailability of parent image
-#Outcome2:  (0, 0) returned if the given puzzle is hard to solve by solver.
-#Outcome3:  (x, y) co-ordinates as to where to place the jigsaw piece in the puzzle 
 
-def getResultCoordinates(_puzzlePath, _piecePath, _piece2Path=None, cdir=COMPLETED_DIR, mode=SOLVEMODE):
-    
+def getResultCoordinates(_puzzlePath, _piecePath, mode=settings.SOLVEMODE):
+    """"
+    Main Module to solve the puzzle
+    Has 3 possible outcome
+    Outcome1:  (None, None) returned if puzzle can't be solved due to unavailability of parent image or some other unforseen error
+    Outcome2:  (P1, P2)
+    where P1 is 2D co-ordinate of the point within jigsaw piece & P2 is the 2D co-ordinate of best-match point within puzzle
+    This result is used to move the jigsaw such that  P1 overlaps with P2
+    """""
+
     puzzle = cv2.imread(_puzzlePath)
     piece1 = cv2.imread(_piecePath)
 
-    ##Debugging
-    #print("Reading : " + (pieceDir + firstPiece))
-    #cv2.imshow('Piece1', piece1)
-    #print("Reading : " + (puzzleDir + puzzleName))
-    #cv2.imshow('Piece1', puzzle)
-    #cv2.waitKey(0)
-    #cv2.destroyAllWindows()
-
-    piece2 = None
     parentImage = None
-    parentFileName = None
-    if(_piece2Path is not None):
-        piece2 = cv2.imread(_piece2Path)
+    # parentFileName = None
 
-    #Iterate through solved puzzle directory to determine the source/parent image.                
-    directory = os.fsencode(cdir)
-    for file in os.listdir(directory):
+    # #Iterate through solved puzzle directory to determine the source/parent image.                
+    # directory = os.fsencode(cdir)
+    # for file in os.listdir(directory):
 
-        #Browsing directory for all .png images (can use bitmap too, doesnt' matter)
-        filename = os.fsdecode(file)
-        image_path = os.path.join(cdir, filename)
-        if filename.endswith(".png"): 
-            sample = cv2.imread(image_path)
+    #     #Browsing directory for all .png images (can use bitmap too, doesnt' matter)
+    #     filename = os.fsdecode(file)
+    #     image_path = os.path.join(cdir, filename)
+    #     if filename.endswith(".png"): 
+    #         sample = cv2.imread(image_path)
 
-            #get the number of properities that are matching between the 2 images
-            #if greater than 250, then they are similar.
-            nMatches = verifyImage(puzzle,sample,VFMODE)
-            if(nMatches > 100):
-                parentImage = sample
-                parentFileName = filename
-                break
-            else:
-                continue
+    #         #get the number of properities that are matching between the 2 images
+    #         #if greater than 250, then they are similar.
+    #         nMatches = verifyImage(puzzle,sample,settings.VFMODE)
+    #         if(nMatches > 100):
+    #             parentImage = sample
+    #             parentFileName = filename
+    #             break
+    #         else:
+    #             continue
+    #     else:
+    #         continue
+
+    for image in settings.IMAGELIST:
+        nMatches = verifyImage(puzzle, image, settings.VFMODE)
+        if(nMatches > 100):
+            parentImage = image
+            # parentFileName = filename
+            break
         else:
             continue
 
@@ -267,7 +254,7 @@ def getResultCoordinates(_puzzlePath, _piecePath, _piece2Path=None, cdir=COMPLET
     else:
         #If found , then find the co-ordinates where the puzzle piece belongs to
         
-        partialSolution, solution, puzzleCoord, pieceCoord = verifyImage(piece1, sample, mode)
+        partialSolution, solution, puzzleCoord, pieceCoord = verifyImage(piece1, parentImage, mode)
 
         result = solution
         if(solution is None):
@@ -275,24 +262,26 @@ def getResultCoordinates(_puzzlePath, _piecePath, _piece2Path=None, cdir=COMPLET
 
         #If no coordinates are found, then the puzzle is highly confusing, try next one
         if(result is None or puzzleCoord is None or pieceCoord is None):
-
-            #Typically happens against plain vanilla images (e.g teacup and sunrise. Both are a pain in ***)
+            puzzleCoord = None
+            pieceCoord = None
+            #Typically happens against plain vanilla images (e.g teacup and sunrise. Both are PITA)
             #print("Failed to solve puzzle gainst source :" + str(parentFileName))
-            return (None, None)
+            return (puzzleCoord, pieceCoord)
         else:
             #If found, output the solution location
-            resultPosition1 = ((puzzleCoord[0][0] - pieceCoord[0][0]), (puzzleCoord[0][1] - pieceCoord[0][1]))
+            print("Piece Coordinates : {} Puzzle Coordinates : {}".format(puzzleCoord, pieceCoord))
+            resultPosition1 = ((puzzleCoord[0][0] - pieceCoord[0][0]),(puzzleCoord[0][1] - pieceCoord[0][1]))
             if(len(puzzleCoord) > 1):
-                resultPosition2 = ((puzzleCoord[1][0] - pieceCoord[1][0]), (puzzleCoord[1][1] - pieceCoord[1][1]))
+                resultPosition2 = ((puzzleCoord[1][0] - pieceCoord[1][0]),(puzzleCoord[1][1] - pieceCoord[1][1]))
                 print("{} or {}".format(resultPosition1, resultPosition2))
             else:
                 print("{}".format(resultPosition1))
             
-            if(mode == HOMMODE):
+            if(mode == settings.HOMMODE):
                 cv2.imshow('Match', result)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
-            return resultPosition1
+            return (resultPosition1, pieceCoord[0])
 
 if __name__ == '__main__':
     # construct the argument parser and parse the arguments
@@ -305,17 +294,18 @@ if __name__ == '__main__':
         help = "Path to the second jigsaw piece (optional)")
     args = vars(ap.parse_args())
 
-
+    if(settings.INITIALIZED  == 0):
+        settings.init()
     puzzleName = args["puzzle"]
     firstPiece = args["fjigsaw"]
     secondPiece = None
     
     if(args["sjigsaw"] is not None):
         secondPiece = args["sjigsaw"]
-        getResultCoordinates(_puzzlePath = (puzzleDir + puzzleName), _piecePath = (pieceDir + firstPiece), _piece2Path = (pieceDir + secondPiece))
+        getResultCoordinates(_puzzlePath = (settings.PUZZLEDIR + puzzleName), _piecePath = (settings.PIECEDIR + firstPiece), _piece2Path = (settings.PIECEDIR + secondPiece))
     else:
-        #getResultCoordinates(_puzzlePath = (puzzleDir + puzzleName), _piecePath = (pieceDir + firstPiece), mode=HOMMODE)
-        getResultCoordinates((puzzleDir + puzzleName), (pieceDir + firstPiece))
+        #getResultCoordinates(_puzzlePath = (settings.PUZZLEDIR + puzzleName), _piecePath = (settings.PIECEDIR  + firstPiece), mode=settings.HOMMODE)
+        getResultCoordinates((settings.PUZZLEDIR + puzzleName), (settings.PIECEDIR + firstPiece))
     
     
             
