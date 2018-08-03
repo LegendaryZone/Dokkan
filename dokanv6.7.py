@@ -1191,11 +1191,11 @@ def sign_in(user_account):
                 if prx:
                     chrome_options.add_argument('--proxy-server=http://%s' % prx)
                 
-                if(settings.BROWSER is None):    
+                if(settings.BROWSER is None):
                     settings.init_browser(chrome_options)
                 wd = settings.BROWSER
                 for kkkkk in range(0, 3):
-                    sampleCollector.solveCaptcha(captcha_url, chrome_options)
+                    sampleCollector.solveCaptcha(captcha_url)
                     text = None
                     tmout = 60
                     print("{}# Solve it in {} seconds".format(id_, tmout))

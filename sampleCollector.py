@@ -65,9 +65,7 @@ def movePieceToPuzzle(_driver, _piece, _GP, _P1, _P2):
 
     """Slant movement as far as possible."""
     if(gx1 < x2):
-        slope = math.ceil((y2 - gy1) / (x2 - gx1))
-        if(slope == 0):
-            slope = -1
+        slope = int(round((y2 - gy1) / (x2 - gx1)))
         if(slope > 0):
             slope *= -1
         xOffset = 1 * speed
@@ -78,9 +76,7 @@ def movePieceToPuzzle(_driver, _piece, _GP, _P1, _P2):
         actionChains.move_by_offset(gx1 - x2, slope * speed)
         gy1 += slope * speed
     elif(gx1 > x2):
-        slope = math.ceil((y2 - gy1) / (x2 - gx1))
-        if(slope == 0):
-            slope = -1
+        slope = int(round((y2 - gy1) / (x2 - gx1)))
         if(slope > 0):
             slope *= -1
         xOffset = -1 * speed
@@ -91,7 +87,7 @@ def movePieceToPuzzle(_driver, _piece, _GP, _P1, _P2):
         actionChains.move_by_offset(x2 - gx1, slope * speed)
         gy1 += slope * speed
 
-    """Remaining distance by robotic"""
+    #Remaining distance by robotic
     if(gy1 > y2):
         yOffset = -1 * speed
         while(gy1 >= y2):
@@ -142,7 +138,7 @@ if __name__ == '__main__':
 
 def solveCaptcha(_pageURL, _mode=settings.SOLVEMODE):
     driver = settings.BROWSER
-    driver.get(_pageURL)
+    driver.get(_pageURL) 
     assert "Authorize with Captcha" in driver.title
     
     GP = None
@@ -156,7 +152,6 @@ def solveCaptcha(_pageURL, _mode=settings.SOLVEMODE):
 
     while True:
         driver.refresh()
-
         imageElement = driver.find_element_by_xpath("//img[contains(@name,'image')]")
         refreshElement = driver.find_element_by_xpath("//a[contains(@id,'change')]")
         pieceElement = driver.find_element_by_xpath("//div[contains(@id,'pieces')]")
