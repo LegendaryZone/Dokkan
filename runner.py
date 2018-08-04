@@ -1,33 +1,33 @@
-import sampleCollector
-from datetime import datetime
-import urllib.request
-import time
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select
 
-import os
-import cv2
-import numpy as np
-from matplotlib import pyplot as plt
-
-
-
-#
-#fileSeparator = "\\"
-#captchaDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_source" +  fileSeparator
-#puzzleDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_puzzle" +  fileSeparator
-#pieceDir = os.path.dirname(os.path.realpath(__file__)) + fileSeparator + "captcha_piece" +  fileSeparator
-#
-#
-#
-#
-#
-#sampleCollector.postProcessCaptcha(captchaDir)
+def get_Element(driver):
+    """Find the "element" on the Chrome settings page."""
+    return driver.find_element_by_css_selector('* /deep/ #clearBrowsingDataConfirm')
 
 
+def clear_cache(driver, timeout=60):
+    """Clear the cookies and cache for the ChromeDriver instance."""
+    # navigate to the settings page
+    driver.get('chrome://settings/clearBrowserData')
+
+    # wait for the button to appear
+    wait = WebDriverWait(driver, timeout)
+    wait.until(get_Element)
+
+    select = Select(driver.find_element_by_css_selector('* /deep/ select#dropdownMenu'))
+    select.select_by_visible_text('All time')
+    # click the button to clear the cache
+    get_Element(driver).click()
+
+    # wait for the button to be gone before returning
+    wait.until_not(get_Element)
 
 
-image = cv2.imread('screenshot.png', True)
-out = np.zeros((320,214,3), np.uint8)
-r = cv2.selectROI("Image", image, False, False)
-cv2.imshow('image', r)
+if __name__ == '__main__':
+    _chrome_options = webdriver.ChromeOptions()
+    _chrome_options.add_argument("--start-maximized")
+    driver = webdriver.Chrome(chrome_options=_chrome_options)
+    clear_cache(driver)
