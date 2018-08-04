@@ -812,10 +812,10 @@ def create_new_account(k, q, platform, account_count):
                         if prx:
                             chrome_options.add_argument('--proxy-server=http://%s' % prx)
 
-                        if(settings.BROWSER is None):    
-                            settings.init_browser(chrome_options)
-                        wd = settings.BROWSER
-                        for kkkkk in range(0, 3):                 
+                        for kkkkk in range(0, 3):
+                            if(settings.BROWSER is None):
+                                settings.init_browser(chrome_options)
+                            wd = settings.BROWSER        
                             sampleCollector.solveCaptcha(captcha_url, settings.SOLVEMODE)                            
                             text = None
                             tmout = 60
@@ -1190,11 +1190,11 @@ def sign_in(user_account):
                 prx = proxy2()
                 if prx:
                     chrome_options.add_argument('--proxy-server=http://%s' % prx)
-                
-                if(settings.BROWSER is None):
-                    settings.init_browser(chrome_options)
-                wd = settings.BROWSER
+
                 for kkkkk in range(0, 3):
+                    if(settings.BROWSER is None):
+                        settings.init_browser(chrome_options)
+                    wd = settings.BROWSER
                     sampleCollector.solveCaptcha(captcha_url, settings.SOLVEMODE)
                     text = None
                     tmout = 60
@@ -1909,6 +1909,7 @@ headers['X-ClientVersion'] = client_version
 while True:
     om = operation_menu()
     if om == 0:
+        settings.BROWSER.close()
         sys.exit(0)
     elif om == 1:
         threads = input("Enter number of parallel runs (Do not overcharge :) ) > ")

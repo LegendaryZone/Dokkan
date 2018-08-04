@@ -7,6 +7,10 @@ global INITIALIZED
 INITIALIZED = 0
 global BROWSER
 BROWSER = None
+global ATTEMPTS
+ATTEMPTS = 0
+global FIRSTTIMER
+FIRSTTIMER = True
 def init():
     """Loads all the completed images for later processing"""
     global INITIALIZED
